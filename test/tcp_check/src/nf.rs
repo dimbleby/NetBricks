@@ -126,6 +126,31 @@ impl EndOffset for ArpHeader {
     fn check_correct(&self, _: &Self::PreviousHeader) -> bool { true }
 }
 
+#[derive(Debug, Default)]
+#[repr(C, packed)]
+struct IcmpHeader {
+    icmp_type: u8,
+    code: u8,
+    checksum: u16,
+    rest: u32,
+}
+
+impl EndOffset for IcmpHeader {
+    type PreviousHeader = IpHeader;
+
+    #[inline]
+    fn offset(&self) -> usize { 8 }
+
+    #[inline]
+    fn size() -> usize { 8 }
+
+    #[inline]
+    fn payload_size(&self, hint: usize) -> usize { hint - 8 }
+
+    #[inline]
+    fn check_correct(&self, _: &Self::PreviousHeader) -> bool { true }
+}
+
 #[inline]
 pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, sched: &mut S, mut stream: mpsc::Sender<Vec<u8>>) -> CompositionBatch {
     let mut groups = parent
