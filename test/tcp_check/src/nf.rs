@@ -63,7 +63,7 @@ impl ArpHeader {
 
     #[inline]
     pub fn spa(&self) -> Ipv4Addr {
-        Ipv4Addr::from(self.spa())
+        Ipv4Addr::from(self.spa)
     }
 
     #[inline]
@@ -73,7 +73,7 @@ impl ArpHeader {
 
     #[inline]
     pub fn tpa(&self) -> Ipv4Addr {
-        Ipv4Addr::from(self.tpa())
+        Ipv4Addr::from(self.tpa)
     }
 }
 
