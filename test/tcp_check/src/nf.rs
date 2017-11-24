@@ -137,36 +137,20 @@ impl fmt::Display for IcmpHeader {
 
 #[inline]
 pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, sched: &mut S, mut stream: mpsc::Sender<Vec<u8>>) -> CompositionBatch {
-    let mut groups = parent
+    let mut mac = parent
         .parse::<MacHeader>()
         .map(box |pkt| {
-            println!("MAC header: {} (len: {})", pkt.get_header(), pkt.get_payload().len());
+            println!("MAC header: {}", pkt.get_header());
         })
         .group_by(3, box |pkt| {
             match pkt.get_header().etype() {
-                0x0800 => 0, // IPv4
-                0x0806 => 1, // ARP
+                0x0806 => 0, // ARP
+                0x0800 => 1, // IPv4
                 _ => 2, // ???
             }
         }, sched);
 
-    let udp = groups.get_group(0).unwrap()
-        .parse::<IpHeader>()
-        .map(box |pkt| {
-            let hdr = pkt.get_header();
-            println!("IP header: {}", hdr);
-        })
-        .filter(box |pkt| {
-            pkt.get_header().protocol() == 17 // UDP
-        })
-        .parse::<UdpHeader>()
-        .map(box move |pkt| {
-            println!("UDP header: {}", pkt.get_header());
-            stream.try_send(pkt.get_payload().to_vec()).unwrap_or_else(|e| println!("Failed to pass to userspace: {}", e));
-        })
-        .compose();
-
-    let arp = groups.get_group(1).unwrap()
+    let arp = mac.get_group(0).unwrap()
         .parse::<ArpHeader>()
         .map(box |pkt| {
             println!("ARP: {}", pkt.get_header());
@@ -185,5 +169,43 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
         })
         .compose();
 
-    merge(vec![udp, arp, groups.get_group(2).unwrap().compose()]).compose()
+
+    let mut ip = mac.get_group(1).unwrap()
+        .parse::<IpHeader>()
+        .map(box |pkt| {
+            let hdr = pkt.get_header();
+            println!("IP header: {}", hdr);
+        })
+        .group_by(3, box |pkt| {
+            match pkt.get_header().protocol() {
+                1  => 0,  // ICMP
+                17 => 1,  // UDP
+                _  => 2,  // ???
+            }
+        }, sched);
+
+    let icmp = ip.get_group(0).unwrap()
+        .parse::<IcmpHeader>()
+        .map(box |pkt| {
+            let hdr = pkt.get_header();
+            println!("ICMP header: {:#?}", hdr);
+        })
+        .filter(box |pkt| {
+            pkt.get_header().icmp_type == 8 // ECHO Request
+        })
+        .transform(box |pkt| {
+            let hdr = pkt.get_mut_header();
+            hdr.icmp_type = 0; // ECHO Reply
+        })
+        .compose();
+
+    let udp = ip.get_group(1).unwrap()
+        .parse::<UdpHeader>()
+        .map(box move |pkt| {
+            println!("UDP header: {}", pkt.get_header());
+            stream.try_send(pkt.get_payload().to_vec()).unwrap_or_else(|e| println!("Failed to pass to userspace: {}", e));
+        })
+        .compose();
+
+    merge(vec![udp, icmp, arp, mac.get_group(2).unwrap().compose(), ip.get_group(2).unwrap().compose()]).compose()
 }
