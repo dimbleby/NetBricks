@@ -118,6 +118,24 @@ impl EndOffset for IcmpHeader {
     fn check_correct(&self, _: &Self::PreviousHeader) -> bool { true }
 }
 
+impl fmt::Display for IcmpHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "type: {} code: {}",
+            self.icmp_type,
+            self.code,
+        )?;
+        if self.icmp_type == 0 || self.icmp_type == 8 {
+            let seq_no = self.rest as u16;
+            let seq_no = u16::from_be(seq_no);
+            write!(f, " seq-no {}", seq_no)?;
+        }
+        Ok(())
+    }
+}
+
+
 #[inline]
 pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, sched: &mut S, mut stream: mpsc::Sender<Vec<u8>>) -> CompositionBatch {
     let mut groups = parent
