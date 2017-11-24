@@ -16,9 +16,9 @@ struct ArpHeader {
     pub plen: u8,
     oper: u16,
     sha: MacAddress,
-    spa: Ipv4Addr,
+    spa: u32,
     tha: MacAddress,
-    tpa: Ipv4Addr,
+    tpa: u32,
 }
 
 impl fmt::Display for ArpHeader {
@@ -62,8 +62,8 @@ impl ArpHeader {
     }
 
     #[inline]
-    pub fn spa(&self) -> &Ipv4Addr {
-        &self.spa
+    pub fn spa(&self) -> Ipv4Addr {
+        Ipv4Addr::from(self.spa)
     }
 
     #[inline]
@@ -72,8 +72,8 @@ impl ArpHeader {
     }
 
     #[inline]
-    pub fn tpa(&self) -> &Ipv4Addr {
-        &self.tpa
+    pub fn tpa(&self) -> Ipv4Addr {
+        Ipv4Addr::from(self.tpa)
     }
 }
 
