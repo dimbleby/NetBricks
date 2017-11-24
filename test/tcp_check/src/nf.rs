@@ -142,6 +142,11 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
         .map(box |pkt| {
             println!("MAC header: {}", pkt.get_header());
         })
+        .transform(box |pkt| {
+            let hdr = pkt.get_mut_header();
+            hdr.dst.copy_address(&hdr.src);
+            hdr.src = MacAddress::new(0xfa, 0x16, 0x3e, 0xfa, 0xc8, 0xfd);
+        })
         .group_by(3, box |pkt| {
             match pkt.get_header().etype() {
                 0x0806 => 0, // ARP
@@ -176,6 +181,12 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
             let hdr = pkt.get_header();
             println!("IP header: {}", hdr);
         })
+        .transform(box |pkt| {
+            let hdr = pkt.get_mut_header();
+            let tmp = hdr.src();
+            hdr.set_dst(tmp);
+            hdr.set_src(0x0afe1803);
+        })
         .group_by(3, box |pkt| {
             match pkt.get_header().protocol() {
                 1  => 0,  // ICMP
@@ -188,7 +199,7 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
         .parse::<IcmpHeader>()
         .map(box |pkt| {
             let hdr = pkt.get_header();
-            println!("ICMP header: {:#?}", hdr);
+            println!("ICMP header: {}", hdr);
         })
         .filter(box |pkt| {
             pkt.get_header().icmp_type == 8 // ECHO Request
