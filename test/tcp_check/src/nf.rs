@@ -85,6 +85,11 @@ impl ArpHeader {
     }
 
     #[inline]
+    pub fn set_oper(&mut self, oper: u16) {
+        self.oper = u16::to_be(oper)
+    }
+
+    #[inline]
     pub fn sha(&self) -> &[u8; 6] {
         &self.sha
     }
@@ -159,14 +164,14 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
         })
         .filter(box |pkt| {
             let hdr = pkt.get_header();
-            hdr.oper() == 1 && hdr.tpa() == 0x0a010101 // Request(1) && 10.1.1.1
+            hdr.oper() == 1 && hdr.tpa() == 0x0afe1803 // Request(1) && 10.254.24.3
         })
         .transform(box |pkt| {
             let hdr = pkt.get_mut_header();
-            hdr.oper = 512;
+            hdr.set_oper(2);
             mem::swap(&mut hdr.sha, &mut hdr.tha);
             mem::swap(&mut hdr.spa, &mut hdr.tpa);
-            hdr.sha = [1,2,3,4,5,6];
+            hdr.sha = [0xfa, 0x16, 0x3e, 0xfa, 0xc8, 0xfd];
             println!("ARP Response: {}", hdr);
         })
         .compose();
