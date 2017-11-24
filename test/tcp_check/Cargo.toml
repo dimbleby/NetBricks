@@ -9,6 +9,8 @@ time = ">=0.1.0"
 getopts = "*"
 rand = "0.3"
 fnv = "*"
+futures = "*"
+tokio-core = "*"
 
 [features]
 default = []
