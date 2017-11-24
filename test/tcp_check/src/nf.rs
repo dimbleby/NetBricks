@@ -8,7 +8,6 @@ use std::net::Ipv4Addr;
 
 use futures::sync::mpsc;
 
-#[derive(Debug, Default)]
 #[repr(C, packed)]
 struct ArpHeader {
     htype: u16,
@@ -16,54 +15,22 @@ struct ArpHeader {
     pub hlen: u8,
     pub plen: u8,
     oper: u16,
-    sha: [u8; 6],
-    spa: u32,
-    tha: [u8; 6],
-    tpa: u32,
+    sha: MacAddress,
+    spa: Ipv4Addr,
+    tha: MacAddress,
+    tpa: Ipv4Addr,
 }
 
 impl fmt::Display for ArpHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Hardware addresses are very likely to be MAC addresses.
-        let sha = if self.htype() == 0x0001 {
-            format!("{}", MacAddress::new_from_slice(self.sha()))
-        } else {
-            format!(
-                "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-                self.sha[0], self.sha[1], self.sha[2],
-                self.sha[3], self.sha[4], self.sha[5],
-            )
-        };
-        let tha = if self.htype() == 0x0001 {
-            format!("{}", MacAddress::new_from_slice(self.tha()))
-        } else {
-            format!(
-                "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-                self.tha[0], self.tha[1], self.tha[2],
-                self.tha[3], self.tha[4], self.tha[5],
-            )
-        };
-
-        // Protocol addresses are very likely to be IPv4.
-        let spa = if self.ptype() == 0x0800 {
-            format!("{}", Ipv4Addr::from(self.spa()))
-        } else {
-            format!("{}", self.spa())
-        };
-        let tpa = if self.ptype() == 0x0800 {
-            format!("{}", Ipv4Addr::from(self.tpa()))
-        } else {
-            format!("{}", self.tpa())
-        };
-
         write!(
             f,
             "{} > {} oper: {}, spa: {} tpa: {}",
-            sha,
-            tha,
+            self.sha(),
+            self.tha(),
             self.oper(),
-            spa,
-            tpa,
+            self.spa(),
+            self.tpa(),
         )
     }
 }
@@ -90,23 +57,23 @@ impl ArpHeader {
     }
 
     #[inline]
-    pub fn sha(&self) -> &[u8; 6] {
+    pub fn sha(&self) -> &MacAddress {
         &self.sha
     }
 
     #[inline]
-    pub fn spa(&self) -> u32 {
-        u32::from_be(self.spa)
+    pub fn spa(&self) -> &Ipv4Addr {
+        &self.spa
     }
 
     #[inline]
-    pub fn tha(&self) -> &[u8; 6] {
+    pub fn tha(&self) -> &MacAddress {
         &self.tha
     }
 
     #[inline]
-    pub fn tpa(&self) -> u32 {
-        u32::from_be(self.tpa)
+    pub fn tpa(&self) -> &Ipv4Addr {
+        &self.tpa
     }
 }
 
@@ -189,14 +156,14 @@ pub fn tcp_nf<T: 'static + Batch<Header = NullHeader>, S: Scheduler>(parent: T, 
         })
         .filter(box |pkt| {
             let hdr = pkt.get_header();
-            hdr.oper() == 1 && hdr.tpa() == 0x0afe1803 // Request(1) && 10.254.24.3
+            hdr.oper() == 1 && hdr.tpa().octets() == [0x0a, 0xfe, 0x18, 0x03] // Request(1) && 10.254.24.3
         })
         .transform(box |pkt| {
             let hdr = pkt.get_mut_header();
             hdr.set_oper(2);
             mem::swap(&mut hdr.sha, &mut hdr.tha);
             mem::swap(&mut hdr.spa, &mut hdr.tpa);
-            hdr.sha = [0xfa, 0x16, 0x3e, 0xfa, 0xc8, 0xfd];
+            hdr.sha = MacAddress::new(0xfa, 0x16, 0x3e, 0xfa, 0xc8, 0xfd);
             println!("ARP Response: {}", hdr);
         })
         .compose();
