@@ -99,7 +99,7 @@ struct IcmpHeader {
     icmp_type: u8,
     code: u8,
     checksum: u16,
-    rest: u32,
+    rest: [u8; 4],
 }
 
 impl EndOffset for IcmpHeader {
@@ -127,8 +127,7 @@ impl fmt::Display for IcmpHeader {
             self.code,
         )?;
         if self.icmp_type == 0 || self.icmp_type == 8 {
-            let seq_no = self.rest as u16;
-            let seq_no = u16::from_be(seq_no);
+            let seq_no = ((self.rest[2] as u16) << 8) | (self.rest[3] as u16);
             write!(f, " seq-no {}", seq_no)?;
         }
         Ok(())
